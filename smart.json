@@ -3,7 +3,7 @@
   "description": "easy forms using jQuery and JSON-Schema",
   "homepage": "https://github.com/ahdinosaur/meteor-alpaca",
   "author": "Michael Williams",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "git": "https://github.com/ahdinosaur/meteor-alpaca.git",
   "packages": {}
 }

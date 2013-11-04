@@ -6938,11 +6938,14 @@ var equiv = function () {
                         }
                         _this.form = form;
                         // allow any post-rendering facilities to kick in
-                        _this.postRender();
-                        // callback
-                        if (callback && Alpaca.isFunction(callback)) {
-                            callback(_this);
-                        }
+                        _this.postRender(function() {
+
+                            // callback
+                            if (callback && Alpaca.isFunction(callback)) {
+                                callback(_this);
+                            }
+
+                        });
                     });
                 });
             } else {
@@ -6951,11 +6954,14 @@ var equiv = function () {
                     // bind our field dom element into the container
                     _this.getEl().appendTo(_this.container);
                     // allow any post-rendering facilities to kick in
-                    _this.postRender();
-                    // callback
-                    if (callback && Alpaca.isFunction(callback)) {
-                        callback(_this);
-                    }
+                    _this.postRender(function() {
+
+                        // callback
+                        if (callback && Alpaca.isFunction(callback)) {
+                            callback(_this);
+                        }
+
+                    });
                 });
             }
         },
@@ -7092,7 +7098,7 @@ var equiv = function () {
          * This method will be called after the field rendition is complete. It is served as a way to make final
          * modifications to the dom elements that were produced.
          */
-        postRender: function() {
+        postRender: function(callback) {
 
             // try to avoid adding unnecessary injections for display view.
             if (this.view.type != 'view') {
@@ -7227,8 +7233,17 @@ var equiv = function () {
             }
 
             // field level post render
-            if (this.options.postRender) {
-                this.options.postRender(this);
+            if (this.options.postRender)
+            {
+                this.options.postRender.call(this, function() {
+
+                    callback();
+
+                });
+            }
+            else
+            {
+                callback();
             }
 
         },
@@ -8073,18 +8088,28 @@ var equiv = function () {
         /**
          * @see Alpaca.Field#postRender
          */
-        postRender: function() {
+        postRender: function(callback)
+        {
+            var self = this;
+
             var labelDiv = $('.alpaca-controlfield-label', this.outerEl);
             if (labelDiv.length) {
                 this.labelDiv = labelDiv;
             }
+
             var helperDiv = $('.alpaca-controlfield-helper', this.outerEl);
             if (helperDiv.length) {
                 this.helperDiv = helperDiv;
             }
-            this.base();
-            // add additional classes
-            this.outerEl.addClass('alpaca-controlfield');
+
+            this.base(function() {
+
+                // add additional classes
+                self.outerEl.addClass('alpaca-controlfield');
+
+                callback();
+
+            });
         },
 
         /**
@@ -8546,23 +8571,38 @@ var equiv = function () {
                     this.fieldContainer = this.outerEl;
                 }
 
+                var asyncHandler = false;
+
                 if (!this.singleLevelRendering && !this.lazyLoading) {
-                    this.renderItems();
+                    asyncHandler = true;
+                    this.renderItems(function() {
+                        if (onSuccess) {
+                            onSuccess();
+                        }
+                    });
                 }
 
                 if (this.lazyLoading) {
                     if (this.labelDiv) {
+                        asyncHandler = true;
                         $(this.labelDiv).click(function() {
                             if (_this.lazyLoading) {
-                                _this.renderItems();
-                                _this.lazyLoading = false;
+                                _this.renderItems(function() {
+                                    _this.lazyLoading = false;
+                                    if (onSuccess) {
+                                        onSuccess();
+                                    }
+                                });
                             }
                         });
                     }
                 }
 
-                if (onSuccess) {
-                    onSuccess();
+                if (!asyncHandler)
+                {
+                    if (onSuccess) {
+                        onSuccess();
+                    }
                 }
             },
 
@@ -9447,67 +9487,84 @@ var equiv = function () {
         /**
          * @see Alpaca.ControlField#postRender
          */
-        postRender: function() {
+        postRender: function(callback) {
 
             var self = this;
 
-            this.base();
+            this.base(function() {
 
-            if (this.field)
-            {
-                // mask it
-                if ( this.field && this.field.mask && this.options.maskString) {
-                    this.field.mask(this.options.maskString);
-                }
-
-                // typeahead?
-                if ( this.field && this.field.typeahead && this.options.typeahead) {
-
-                    var tconfig = {};
-                    for (var k in this.options.typeahead) {
-                        tconfig[k] = this.options.typeahead[k];
+                if (self.field)
+                {
+                    // mask it
+                    if ( self.field && self.field.mask && self.options.maskString) {
+                        self.field.mask(self.options.maskString);
                     }
 
-                    if (!tconfig.name) {
-                        tconfig.name = this.getId();
-                    }
+                    // typeahead?
+                    if ( self.field && self.field.typeahead && self.options.typeahead) {
 
-                    $(this.field).typeahead(tconfig);
-
-                    // listen for "autocompleted" event and set the value of the field
-                    $(this.field).on("typeahead:autocompleted", function(event, datum) {
-                        self.setValue(datum.value);
-                    });
-
-                    // listen for "selected" event and set the value of the field
-                    $(this.field).on("typeahead:selected", function(event, datum) {
-                        self.setValue(datum.value);
-                    });
-
-                    // custom events
-                    if (tconfig.events)
-                    {
-                        if (tconfig.events.autocompleted) {
-                            $(this.field).on("typeahead:autocompleted", function(event, datum) {
-                                tconfig.events.autocompleted(event, datum);
-                            });
+                        var tconfig = {};
+                        for (var k in self.options.typeahead) {
+                            tconfig[k] = self.options.typeahead[k];
                         }
-                        if (tconfig.events.selected) {
-                            $(this.field).on("typeahead:selected", function(event, datum) {
-                                tconfig.events.selected(event, datum);
-                            });
+
+                        if (!tconfig.name) {
+                            tconfig.name = self.getId();
                         }
+
+                        $(self.field).typeahead(tconfig);
+
+                        // listen for "autocompleted" event and set the value of the field
+                        $(self.field).on("typeahead:autocompleted", function(event, datum) {
+                            self.setValue(datum.value);
+                        });
+
+                        // listen for "selected" event and set the value of the field
+                        $(self.field).on("typeahead:selected", function(event, datum) {
+                            self.setValue(datum.value);
+                        });
+
+                        // custom events
+                        if (tconfig.events)
+                        {
+                            if (tconfig.events.autocompleted) {
+                                $(self.field).on("typeahead:autocompleted", function(event, datum) {
+                                    tconfig.events.autocompleted(event, datum);
+                                });
+                            }
+                            if (tconfig.events.selected) {
+                                $(self.field).on("typeahead:selected", function(event, datum) {
+                                    tconfig.events.selected(event, datum);
+                                });
+                            }
+                        }
+
+                        // when the input value changes, change the query in typeahead
+                        // this is to keep the typeahead control sync'd with the actual dom value
+                        // only do this if the query doesn't already match
+                        var fi = $(self.field);
+                        $(self.field).change(function() {
+
+                            var value = $(this).val();
+                            var currentQuery = $(fi).typeahead('getQuery');
+                            if (currentQuery != value)
+                            {
+                                $(fi).typeahead('setQuery', value);
+                            }
+
+                        });
+                    }
+
+                    if (self.fieldContainer) {
+                        self.fieldContainer.addClass('alpaca-controlfield-text');
                     }
                 }
 
-                if (this.fieldContainer) {
-                    this.fieldContainer.addClass('alpaca-controlfield-text');
-                }
-            }
+                callback();
+            });
 
         },
 
-        
         /**
          * @see Alpaca.Field#getValue
          */
@@ -9665,7 +9722,7 @@ var equiv = function () {
         
     });
 
-    Alpaca.registerTemplate("controlFieldText", '<input type="text" id="${id}"  {{if options.placeholder}}placeholder="${options.placeholder}"{{/if}} {{if options.size}}size="${options.size}"{{/if}} {{if options.readonly}}readonly="readonly"{{/if}} {{if name}}name="${name}"{{/if}} {{each(i,v) options.data}}data-${i}="${v}"{{/each}}/>');
+    Alpaca.registerTemplate("controlFieldText", '<input type="text" id="${id}" {{if options.placeholder}}placeholder="${options.placeholder}"{{/if}} {{if options.size}}size="${options.size}"{{/if}} {{if options.readonly}}readonly="readonly"{{/if}} {{if name}}name="${name}"{{/if}} {{each(i,v) options.data}}data-${i}="${v}"{{/each}}/>');
     Alpaca.registerMessages({
         "invalidPattern": "This field should have pattern {0}",
         "stringTooShort": "This field should contain at least {0} numbers or characters",
@@ -9721,11 +9778,18 @@ var equiv = function () {
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-textarea');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-textarea');
+                }
+
+                callback();
+            });
         },
 
         /**
@@ -9793,7 +9857,7 @@ var equiv = function () {
         "wordLimitExceeded": "The maximum word limit of {0} has been exceeded."
     });
 
-    Alpaca.registerTemplate("controlFieldTextarea", '<textarea id="${id}" {{if options.rows}}rows="${options.rows}"{{/if}} {{if options.cols}}cols="${options.cols}"{{/if}} {{if options.readonly}}readonly="readonly"{{/if}} {{if name}}name="${name}"{{/if}} {{each options.data}}data-${fieldId}="${value}"{{/each}}/>');
+    Alpaca.registerTemplate("controlFieldTextarea", '<textarea id="${id}" {{if options.placeholder}}placeholder="${options.placeholder}"{{/if}} {{if options.rows}}rows="${options.rows}"{{/if}} {{if options.cols}}cols="${options.cols}"{{/if}} {{if options.readonly}}readonly="readonly"{{/if}} {{if name}}name="${name}"{{/if}} {{each options.data}}data-${fieldId}="${value}"{{/each}}/>');
     Alpaca.registerFieldClass("textarea", Alpaca.Fields.TextAreaField);
 
 })(jQuery);
@@ -9877,11 +9941,18 @@ var equiv = function () {
             /**
              * @see Alpaca.ControlField#postRender
              */
-            postRender: function() {
-                this.base();
-                if (this.fieldContainer) {
-                    this.fieldContainer.addClass('alpaca-controlfield-checkbox');
-                }
+            postRender: function(callback) {
+
+                var self = this;
+
+                this.base(function() {
+
+                    if (self.fieldContainer) {
+                        self.fieldContainer.addClass('alpaca-controlfield-checkbox');
+                    }
+
+                    callback();
+                });
             },
 
             /**
@@ -10027,12 +10098,19 @@ var equiv = function () {
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            // apply additional css
-			if (this.fieldContainer) {
-				this.fieldContainer.addClass("alpaca-controlfield-file");
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                // apply additional css
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass("alpaca-controlfield-file");
+                }
+
+                callback();
+            });
 
             // listen for change events on the field
         }
@@ -10342,11 +10420,18 @@ var equiv = function () {
         /**
          * @see Alpaca.ControlField#postRender
          */
-        postRender: function() {
-            this.base();
-			if (this.fieldContainer) {
-				this.fieldContainer.addClass('alpaca-controlfield-radio');
-			}
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-radio');
+                }
+
+                callback();
+            });
         },
         
         /**
@@ -10413,9 +10498,16 @@ var equiv = function () {
         /**
          * @see Alpaca.Field#getValue
          */
-        getValue: function() {
+        getValue: function()
+        {
             if (this.field) {
-                return this.base(this.field.val());
+                var val = this.field.val();
+                if (!val)
+                {
+                    val = this.data;
+                }
+
+                return this.base(val);
             }
         },
 
@@ -10507,11 +10599,18 @@ var equiv = function () {
         /**
          * @see Alpaca.ControlField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-select');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-select');
+                }
+
+                callback();
+            })
         },
 
         /**
@@ -10656,12 +10755,19 @@ var equiv = function () {
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-			if (this.fieldContainer) {
-				this.fieldContainer.addClass('alpaca-controlfield-number');
-			}
-        },		
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-number');
+                }
+
+                callback();
+            });
+        },
 				
         /**
          * @see Alpaca.Fields.TextField#handleValidate
@@ -11485,7 +11591,7 @@ var equiv = function () {
         /**
          * @see Alpaca.ContainerField#renderItems
          */
-        renderItems: function() {
+        renderItems: function(onSuccess) {
             var _this = this;
 
             // mark field container as empty by default
@@ -11498,16 +11604,40 @@ var equiv = function () {
                 // so we only need to load this once
                 _this.resolveItemSchemaOptions(function(schema, options) {
 
-                    $.each(_this.data, function(index, value) {
-                        _this.addItem(index, schema, options, value, false);
-                    });
+                    // workhorse function
+                    // adds an item and then recursively fires down from the callback until the end of the list is reached
+                    var handleItem = function(index)
+                    {
+                        if (index === _this.data.length)
+                        {
+                            _this.updateToolbarItemsStatus();
 
-                    _this.updateToolbarItemsStatus();
+                            if (onSuccess)
+                            {
+                                onSuccess();
+                            }
+
+                            return;
+                        }
+
+                        var value = _this.data[index];
+
+                        _this.addItem(index, schema, options, value, false, false, function() {
+                            handleItem(index+1);
+                        });
+
+                    };
+                    handleItem(0);
                 });
             }
             else
             {
                 this.updateToolbarItemsStatus();
+
+                if (onSuccess)
+                {
+                    onSuccess();
+                }
             }
         },
 
@@ -11763,59 +11893,65 @@ var equiv = function () {
             /**
              * @see Alpaca.Field#postRender
              */
-            postRender: function() {
-                this.base();
-                // Generates wizard if requested
-                if (this.isTopLevel()) {
-                    if (this.view) {
-                        this.wizardConfigs = this.view.getWizard();
-                        if (this.wizardConfigs) {
+            postRender: function(callback) {
 
-                            // set up defaults for wizard
-                            if (Alpaca.isUndefined(this.wizardConfigs.validation)) {
-                                this.wizardConfigs.validation = true;
-                            }
-                            if (!this.wizardConfigs.buttons) {
-                                this.wizardConfigs.buttons = {};
-                            }
+                var self = this;
 
-                            // done
-                            if (!this.wizardConfigs.buttons.done) {
-                                this.wizardConfigs.buttons.done = {};
-                            }
-                            if (Alpaca.isUndefined(this.wizardConfigs.buttons.done.validateOnClick)) {
-                                this.wizardConfigs.buttons.done.validateOnClick = true;
-                            }
+                this.base(function() {
 
-                            // prev
-                            if (!this.wizardConfigs.buttons.prev) {
-                                this.wizardConfigs.buttons.prev = {};
-                            }
-                            if (Alpaca.isUndefined(this.wizardConfigs.buttons.prev.validateOnClick)) {
-                                this.wizardConfigs.buttons.prev.validateOnClick = true;
-                            }
+                    // Generates wizard if requested
+                    if (self.isTopLevel()) {
+                        if (self.view) {
+                            self.wizardConfigs = self.view.getWizard();
+                            if (self.wizardConfigs) {
 
-                            // next
-                            if (!this.wizardConfigs.buttons.next) {
-                                this.wizardConfigs.buttons.next = {};
-                            }
-                            if (Alpaca.isUndefined(this.wizardConfigs.buttons.next.validateOnClick)) {
-                                this.wizardConfigs.buttons.next.validateOnClick = true;
-                            }
+                                // set up defaults for wizard
+                                if (Alpaca.isUndefined(self.wizardConfigs.validation)) {
+                                    self.wizardConfigs.validation = true;
+                                }
+                                if (!self.wizardConfigs.buttons) {
+                                    self.wizardConfigs.buttons = {};
+                                }
 
-                        }
-                        var layoutTemplateDescriptor = this.view.getLayout().templateDescriptor;
-                        if (this.wizardConfigs && this.wizardConfigs.renderWizard) {
-                            if (layoutTemplateDescriptor) {
-                                //Wizard based on layout
-                                this.wizard();
-                            } else {
-                                //Wizard based on injections
-                                this.autoWizard();
+                                // done
+                                if (!self.wizardConfigs.buttons.done) {
+                                    self.wizardConfigs.buttons.done = {};
+                                }
+                                if (Alpaca.isUndefined(self.wizardConfigs.buttons.done.validateOnClick)) {
+                                    self.wizardConfigs.buttons.done.validateOnClick = true;
+                                }
+
+                                // prev
+                                if (!self.wizardConfigs.buttons.prev) {
+                                    self.wizardConfigs.buttons.prev = {};
+                                }
+                                if (Alpaca.isUndefined(self.wizardConfigs.buttons.prev.validateOnClick)) {
+                                    self.wizardConfigs.buttons.prev.validateOnClick = true;
+                                }
+
+                                // next
+                                if (!self.wizardConfigs.buttons.next) {
+                                    self.wizardConfigs.buttons.next = {};
+                                }
+                                if (Alpaca.isUndefined(self.wizardConfigs.buttons.next.validateOnClick)) {
+                                    self.wizardConfigs.buttons.next.validateOnClick = true;
+                                }
+                            }
+                            var layoutTemplateDescriptor = self.view.getLayout().templateDescriptor;
+                            if (self.wizardConfigs && self.wizardConfigs.renderWizard) {
+                                if (layoutTemplateDescriptor) {
+                                    //Wizard based on layout
+                                    self.wizard();
+                                } else {
+                                    //Wizard based on injections
+                                    self.autoWizard();
+                                }
                             }
                         }
                     }
-                }
+
+                    callback();
+                });
             },
 
             /**
@@ -12025,7 +12161,7 @@ var equiv = function () {
             /**
              * @see Alpaca.ContainerField#renderItems
              */
-            renderItems: function() {
+            renderItems: function(onSuccess) {
 
                 var _this = this;
 
@@ -12044,7 +12180,7 @@ var equiv = function () {
                     properties = _this.schema.properties;
                 }
 
-                var cf = function(validPropertyIds)
+                var cf = function()
                 {
                     // If the schema and the data line up perfectly, then there will be no properties in the data that are
                     // not also in the schema, and thus, extraDataProperties will be empty.
@@ -12076,19 +12212,43 @@ var equiv = function () {
                     }
 
                     _this.renderValidationState();
+
+                    if (onSuccess)
+                    {
+                        onSuccess();
+                    }
                 };
 
                 // each property in the object can have a different schema and options so we need to process
                 // asynchronously and wait for all to complete
 
+                // figure out the total count of properties that we need to iterate through
                 var total = 0;
                 for (var propertyId in properties)
                 {
                     total++;
                 }
-                var complete = 0;
+
+                // collect all the property ids since we'll churn through them by property key
+                var propertyIds = [];
                 for (var propertyId in properties)
                 {
+                    propertyIds.push(propertyId);
+                }
+
+                // workhorse function for a single property
+                var handleProperty = function(index)
+                {
+                    if (index === total)
+                    {
+                        // all done, fire completion function
+                        cf();
+
+                        return;
+                    }
+
+                    var propertyId = propertyIds[index];
+
                     var itemData = null;
                     if (_this.data)
                     {
@@ -12115,16 +12275,11 @@ var equiv = function () {
                             // remove from extraDataProperties helper
                             delete extraDataProperties[propertyId];
 
-                            complete++;
-                            if (complete === total)
-                            {
-                                // move ahead
-                                cf();
-                            }
-
+                            handleProperty(index + 1);
                         });
                     });
-                }
+                };
+                handleProperty(0);
             },
 
 
@@ -12900,14 +13055,6 @@ var equiv = function () {
         },
 
         /**
-         * @see Alpaca.ControlField#postRender
-         */
-        postRender: function() {
-            this.base();
-        },
-
-
-        /**
          * @see Alpaca.Field#getValue
          */
         getValue: function() {
@@ -13026,13 +13173,19 @@ var equiv = function () {
         /**
          * @see Alpaca.ControlField#postRender
          */
-        postRender: function() {
+        postRender: function(callback) {
 
-            this.base();
+            var self = this;
 
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-hidden');
-            }
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-hidden');
+                }
+
+                callback();
+            });
+
         },
 
         
@@ -13519,30 +13672,36 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
+        postRender: function(callback) {
 
-            if (this.field && $.datepicker)
-            {
-                var datePickerOptions = this.options.datepicker;
-                if (!datePickerOptions)
+            var self = this;
+
+            this.base(function() {
+
+                if (self.field && $.datepicker)
                 {
-                    datePickerOptions = {
-                        "changeMonth": true,
-                        "changeYear": true
-                    };
-                }
-                if (!datePickerOptions.dateFormat)
-                {
-                    datePickerOptions.dateFormat = this.options.dateFormat;
-                }
-                this.field.datepicker(datePickerOptions);
+                    var datePickerOptions = self.options.datepicker;
+                    if (!datePickerOptions)
+                    {
+                        datePickerOptions = {
+                            "changeMonth": true,
+                            "changeYear": true
+                        };
+                    }
+                    if (!datePickerOptions.dateFormat)
+                    {
+                        datePickerOptions.dateFormat = self.options.dateFormat;
+                    }
+                    self.field.datepicker(datePickerOptions);
 
-                if (this.fieldContainer) {
-                    this.fieldContainer.addClass('alpaca-controlfield-date');
+                    if (self.fieldContainer) {
+                        self.fieldContainer.addClass('alpaca-controlfield-date');
+                    }
                 }
-            }
 
+                callback();
+
+            });
         },
 
         /**
@@ -13652,36 +13811,42 @@ address:
             /**
              * @see Alpaca.Fields.TextField#postRender
              */
-            postRender: function() {
-                var _this = this;
-                this.base();
+            postRender: function(callback) {
 
-                if (this.field)
-                {
-                    if (this.field.datetimepicker) {
-                        this.field.hover(function() {
-                            if (!$(this).hasClass('hasDatepicker')) {
+                var self = this;
 
-                                var timePickerOptions = _this.options.timepicker;
-                                if (!timePickerOptions)
-                                {
-                                    timePickerOptions = _this.options.timepicker;
+                this.base(function() {
+
+                    if (self.field)
+                    {
+                        if (self.field.datetimepicker) {
+                            self.field.hover(function() {
+                                if (!$(this).hasClass('hasDatepicker')) {
+
+                                    var timePickerOptions = self.options.timepicker;
+                                    if (!timePickerOptions)
+                                    {
+                                        timePickerOptions = self.options.timepicker;
+                                    }
+                                    if (!timePickerOptions)
+                                    {
+                                        timePickerOptions = {
+                                            "changeYear": true,
+                                            "changeMonth": true
+                                        };
+                                    }
+                                    $(this).datetimepicker(timePickerOptions);
                                 }
-                                if (!timePickerOptions)
-                                {
-                                    timePickerOptions = {
-                                        "changeYear": true,
-                                        "changeMonth": true
-                                    };
-                                }
-                                $(this).datetimepicker(timePickerOptions);
+                            });
+                            if (self.fieldContainer) {
+                                self.fieldContainer.addClass('alpaca-controlfield-datetime');
                             }
-                        });
-                        if (this.fieldContainer) {
-                            this.fieldContainer.addClass('alpaca-controlfield-datetime');
                         }
                     }
-                }
+
+                    callback();
+
+                });
             },
 
             /**
@@ -13765,110 +13930,118 @@ address:
             /**
              * @see Alpaca.Fields.TextField#postRender
              */
-            postRender: function() {
-                this.base();
+            postRender: function(callback) {
 
                 var self = this;
 
-                if (this.fieldContainer) {
-                    this.fieldContainer.addClass('alpaca-controlfield-editor');
+                this.base(function() {
 
-                    // set field container parent width = 100%
-                    $(this.fieldContainer).parent().css("width", "100%");
-
-                    // ACE HEIGHT
-                    var aceHeight = this.options.aceHeight;
-                    if (aceHeight)
+                    if (self.fieldContainer)
                     {
-                        $(this.fieldContainer).css("height", aceHeight);
-                    }
+                        self.fieldContainer.addClass('alpaca-controlfield-editor');
 
-                    // ACE WIDTH
-                    var aceWidth = this.options.aceWidth;
-                    if (!aceWidth) {
-                        aceWidth = "100%";
-                    }
-                    $(this.fieldContainer).css("width", aceWidth);
-                }
+                        // set field container parent width = 100%
+                        $(self.fieldContainer).parent().css("width", "100%");
 
-                // locate where we will insert the editor
-                var el = $(this.fieldContainer).find(".control-field-editor-el")[0];
-
-                // ace must be included ahead of time
-                if (!ace && window.ace) {
-                    ace = window.ace;
-                }
-
-                if (!ace)
-                {
-                    Alpaca.logError("Editor Field is missing the 'ace' Cloud 9 Editor");
-                }
-                else
-                {
-                    this.editor = ace.edit(el);
-
-                    // theme
-                    var aceTheme = this.options.aceTheme;
-                    if (!aceTheme) {
-                        aceTheme = "ace/theme/chrome";
-                    }
-                    this.editor.setTheme(aceTheme);
-
-                    // mode
-                    var aceMode = this.options.aceMode;
-                    if (!aceMode) {
-                        aceMode = "ace/mode/json";
-                    }
-                    this.editor.getSession().setMode(aceMode);
-
-                    this.editor.renderer.setHScrollBarAlwaysVisible(false);
-                    //this.editor.renderer.setVScrollBarAlwaysVisible(false); // not implemented
-                    this.editor.setShowPrintMargin(false);
-
-                    // set data onto editor
-                    this.editor.setValue(this.data);
-                    this.editor.clearSelection();
-
-                    // FIT-CONTENT the height of the editor to the contents contained within
-                    if (this.options.aceFitContentHeight)
-                    {
-                        var heightUpdateFunction = function() {
-
-                            // http://stackoverflow.com/questions/11584061/
-                            var newHeight = self.editor.getSession().getScreenLength() * self.editor.renderer.lineHeight + self.editor.renderer.scrollBar.getWidth();
-
-                            $(self.fieldContainer).height(newHeight.toString() + "px");
-
-                            // This call is required for the editor to fix all of
-                            // its inner structure for adapting to a change in size
-                            self.editor.resize();
-                        };
-
-                        // Set initial size to match initial content
-                        heightUpdateFunction();
-
-                        // Whenever a change happens inside the ACE editor, update
-                        // the size again
-                        self.editor.getSession().on('change', heightUpdateFunction);
-                    }
-
-                    // READONLY
-                    if (this.schema.readonly)
-                    {
-                        this.editor.setReadOnly(true);
-                    }
-
-                    // if the editor's dom element gets destroyed, make sure we clean up the editor instance
-                    // normally, we expect Alpaca fields to be destroyed by the destroy() method but they may also be
-                    // cleaned-up via the DOM, thus we check here.
-                    $(el).bind('destroyed', function() {
-
-                        if (self.editor) {
-                            self.editor.destroy();
-                            self.editor = null;
+                        // ACE HEIGHT
+                        var aceHeight = self.options.aceHeight;
+                        if (aceHeight)
+                        {
+                            $(self.fieldContainer).css("height", aceHeight);
                         }
-                    });
-                }
+
+                        // ACE WIDTH
+                        var aceWidth = self.options.aceWidth;
+                        if (!aceWidth) {
+                            aceWidth = "100%";
+                        }
+                        $(self.fieldContainer).css("width", aceWidth);
+                    }
+
+                    // locate where we will insert the editor
+                    var el = $(self.fieldContainer).find(".control-field-editor-el")[0];
+
+                    // ace must be included ahead of time
+                    if (!ace && window.ace) {
+                        ace = window.ace;
+                    }
+
+                    if (!ace)
+                    {
+                        Alpaca.logError("Editor Field is missing the 'ace' Cloud 9 Editor");
+                    }
+                    else
+                    {
+                        self.editor = ace.edit(el);
+
+                        // theme
+                        var aceTheme = self.options.aceTheme;
+                        if (!aceTheme) {
+                            aceTheme = "ace/theme/chrome";
+                        }
+                        self.editor.setTheme(aceTheme);
+
+                        // mode
+                        var aceMode = self.options.aceMode;
+                        if (!aceMode) {
+                            aceMode = "ace/mode/json";
+                        }
+                        self.editor.getSession().setMode(aceMode);
+
+                        self.editor.renderer.setHScrollBarAlwaysVisible(false);
+                        //this.editor.renderer.setVScrollBarAlwaysVisible(false); // not implemented
+                        self.editor.setShowPrintMargin(false);
+
+                        // set data onto editor
+                        self.editor.setValue(self.data);
+                        self.editor.clearSelection();
+
+                        // clear undo session
+                        self.editor.getSession().getUndoManager().reset();
+
+                        // FIT-CONTENT the height of the editor to the contents contained within
+                        if (self.options.aceFitContentHeight)
+                        {
+                            var heightUpdateFunction = function() {
+
+                                // http://stackoverflow.com/questions/11584061/
+                                var newHeight = self.editor.getSession().getScreenLength() * self.editor.renderer.lineHeight + self.editor.renderer.scrollBar.getWidth();
+
+                                $(self.fieldContainer).height(newHeight.toString() + "px");
+
+                                // This call is required for the editor to fix all of
+                                // its inner structure for adapting to a change in size
+                                self.editor.resize();
+                            };
+
+                            // Set initial size to match initial content
+                            heightUpdateFunction();
+
+                            // Whenever a change happens inside the ACE editor, update
+                            // the size again
+                            self.editor.getSession().on('change', heightUpdateFunction);
+                        }
+
+                        // READONLY
+                        if (self.schema.readonly)
+                        {
+                            self.editor.setReadOnly(true);
+                        }
+
+                        // if the editor's dom element gets destroyed, make sure we clean up the editor instance
+                        // normally, we expect Alpaca fields to be destroyed by the destroy() method but they may also be
+                        // cleaned-up via the DOM, thus we check here.
+                        $(el).bind('destroyed', function() {
+
+                            if (self.editor) {
+                                self.editor.destroy();
+                                self.editor = null;
+                            }
+                        });
+                    }
+
+                    callback();
+                });
 
             },
 
@@ -13904,13 +14077,33 @@ address:
 
                 var valInfo = this.validation;
 
-                var status =  this._validateWordCount();
+                var wordCountStatus =  this._validateWordCount();
                 valInfo["wordLimitExceeded"] = {
-                    "message": status ? "" : Alpaca.substituteTokens(this.view.getMessage("wordLimitExceeded"), [this.options.wordlimit]),
-                    "status": status
+                    "message": wordCountStatus ? "" : Alpaca.substituteTokens(this.view.getMessage("wordLimitExceeded"), [this.options.wordlimit]),
+                    "status": wordCountStatus
                 };
 
-                return baseStatus && valInfo["wordLimitExceeded"]["status"];
+                var editorAnnotationsStatus = this._validateEditorAnnotations();
+                valInfo["editorAnnotationsExist"] = {
+                    "message": editorAnnotationsStatus ? "" : this.view.getMessage("editorAnnotationsExist"),
+                    "status": editorAnnotationsStatus
+                };
+
+                return baseStatus && valInfo["wordLimitExceeded"]["status"] && valInfo["editorAnnotationsExist"]["status"];
+            },
+
+            _validateEditorAnnotations: function() {
+
+                if (this.editor)
+                {
+                    var annotations = this.editor.getSession().getAnnotations();
+                    if (annotations && annotations.length > 0)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
             },
 
             /**
@@ -13983,7 +14176,8 @@ address:
         });
 
     Alpaca.registerMessages({
-        "wordLimitExceeded": "The maximum word limit of {0} has been exceeded."
+        "wordLimitExceeded": "The maximum word limit of {0} has been exceeded.",
+        "editorAnnotationsExist": "The editor has errors in it that must be corrected"
     });
 
     Alpaca.registerTemplate("controlFieldEditor", '<div id="${id}" class="control-field-editor-el"></div>');
@@ -14031,11 +14225,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-email');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (this.fieldContainer) {
+                    this.fieldContainer.addClass('alpaca-controlfield-email');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -14127,30 +14329,38 @@ address:
         /**
          * @see Alpaca.Fields.NumberField#postRender
          */
-        postRender: function() {
-            this.base();
-            var _this = this;
-            if (this.options.slider) {
-                if (!Alpaca.isEmpty(this.schema.maximum) && !Alpaca.isEmpty(this.schema.minimum)) {
+        postRender: function(callback)
+        {
+            var self = this;
 
-                    if (this.field)
-                    {
-                        this.field.after('<div id="slider"></div>');
-                        this.slider = $('#slider', this.field.parent()).slider({
-                            value: this.getValue(),
-                            min: this.schema.minimum,
-                            max: this.schema.maximum,
-                            slide: function(event, ui) {
-                                _this.setValue(ui.value);
-                                _this.renderValidationState();
-                            }
-                        });
+            this.base(function() {
+
+                if (self.options.slider) {
+                    if (!Alpaca.isEmpty(self.schema.maximum) && !Alpaca.isEmpty(self.schema.minimum)) {
+
+                        if (self.field)
+                        {
+                            self.field.after('<div id="slider"></div>');
+                            self.slider = $('#slider', self.field.parent()).slider({
+                                value: self.getValue(),
+                                min: self.schema.minimum,
+                                max: self.schema.maximum,
+                                slide: function(event, ui) {
+                                    self.setValue(ui.value);
+                                    self.renderValidationState();
+                                }
+                            });
+                        }
                     }
                 }
-            }
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-integer');
-            }
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-integer');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -14244,11 +14454,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-			if (this.fieldContainer) {
-				this.fieldContainer.addClass('alpaca-controlfield-ipv4');
-			}	
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-ipv4');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -14373,37 +14591,43 @@ address:
         /**
          * @see Alpaca.Fields.TextAreaField#postRender
          */
-        postRender: function() {
-            this.base();
-            var _this = this;
+        postRender: function(callback) {
 
-            if (this.field)
-            {
-                // Some auto-formatting capabilities
-                this.field.bind('keypress', function(e) {
-                    //console.log(e.which);
-                    if (e.which == 34) {
-                        _this.field.insertAtCaret('"');
-                    }
-                    if (e.which == 123) {
-                        _this.field.insertAtCaret('}');
-                    }
-                    if (e.which == 91) {
-                        _this.field.insertAtCaret(']');
-                    }
-                });
-                this.field.bind('keypress', 'Ctrl+l', function() {
-                    _this.getEl().removeClass("alpaca-field-focused");
+            var self = this;
 
-                    // set class from state
-                    _this.renderValidationState();
-                });
-                this.field.attr('title','Type Ctrl+L to format and validate the JSON string.');
-            }
+            this.base(function() {
 
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-json');
-            }
+                if (self.field)
+                {
+                    // Some auto-formatting capabilities
+                    self.field.bind('keypress', function(e) {
+                        //console.log(e.which);
+                        if (e.which == 34) {
+                            self.field.insertAtCaret('"');
+                        }
+                        if (e.which == 123) {
+                            self.field.insertAtCaret('}');
+                        }
+                        if (e.which == 91) {
+                            self.field.insertAtCaret(']');
+                        }
+                    });
+                    self.field.bind('keypress', 'Ctrl+l', function() {
+                        self.getEl().removeClass("alpaca-field-focused");
+
+                        // set class from state
+                        self.renderValidationState();
+                    });
+                    self.field.attr('title','Type Ctrl+L to format and validate the JSON string.');
+                }
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-json');
+                }
+
+                callback();
+
+            });
 
         }
     });
@@ -14609,30 +14833,38 @@ address:
         /**
          * @see Alpaca.Fields.NumberField#postRender
          */
-        postRender: function() {
-            this.base();
-            var _this = this;
-            if (this.options.slider) {
-                if (!Alpaca.isEmpty(this.schema.maximum) && !Alpaca.isEmpty(this.schema.minimum)) {
+        postRender: function(callback)
+        {
+            var self = this;
 
-                    if (this.field)
-                    {
-                        this.field.after('<div id="slider"></div>');
-                        this.slider = $('#slider', this.field.parent()).slider({
-                            value: this.getValue(),
-                            min: this.schema.minimum,
-                            max: this.schema.maximum,
-                            slide: function(event, ui) {
-                                _this.setValue(ui.value);
-                                _this.renderValidationState();
-                            }
-                        });
+            this.base(function() {
+
+                if (self.options.slider) {
+                    if (!Alpaca.isEmpty(self.schema.maximum) && !Alpaca.isEmpty(self.schema.minimum)) {
+
+                        if (self.field)
+                        {
+                            self.field.after('<div id="slider"></div>');
+                            self.slider = $('#slider', self.field.parent()).slider({
+                                value: self.getValue(),
+                                min: self.schema.minimum,
+                                max: self.schema.maximum,
+                                slide: function(event, ui) {
+                                    self.setValue(ui.value);
+                                    self.renderValidationState();
+                                }
+                            });
+                        }
                     }
                 }
-            }
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-integer');
-            }
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-integer');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -14715,11 +14947,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-lowercase');
-            }
+        postRender: function(callback)
+        {
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-lowercase');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -14901,11 +15141,19 @@ address:
         /**
          * @see Alpaca.Fields.TextAreaField#postRender
          */
-        postRender: function() {
-            this.base();
-			if (this.fieldContainer) {
-				this.fieldContainer.addClass('alpaca-controlfield-map');
-			}
+        postRender: function(callback)
+        {
+            var self = this;
+
+            this.base(function() {
+
+                if (this.fieldContainer) {
+                    this.fieldContainer.addClass('alpaca-controlfield-map');
+                }
+
+                callback();
+            });
+
         }
     });
 
@@ -14960,11 +15208,18 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-			if (this.fieldContainer) {
-				this.fieldContainer.addClass('alpaca-controlfield-password');
-			}
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-password');
+                }
+
+                callback();
+            });
         },
 
         /**
@@ -15020,11 +15275,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-personalname');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-personalname');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -15112,11 +15375,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-phone');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-phone');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -15182,11 +15453,18 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-tag');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-tag');
+                }
+
+                callback();
+            });
         },
 
         /**
@@ -15283,11 +15561,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-time');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-time');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -15365,12 +15651,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
+        postRender: function(callback) {
 
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-uppercase');
-            }
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-uppercase');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -15472,61 +15765,67 @@ address:
         /**
          * @see Alpaca.Fields.TextAreaField#postRender
          */
-        postRender: function() {
-            this.base();            
-			// see if we can render jWysiwyg
-            var _this = this;
+        postRender: function(callback) {
 
-            if (this.field && $.wysiwyg)
-            {
-                var wysiwygOptions = this.options.wysiwyg ? this.options.wysiwyg : {};
+            var self = this;
 
-                if (wysiwygOptions.controls)
+            this.base(function() {
+
+                // see if we can render jWysiwyg
+                if (self.field && $.wysiwyg)
                 {
-                    if (typeof(wysiwygOptions.controls) === "string")
+                    var wysiwygOptions = self.options.wysiwyg ? self.options.wysiwyg : {};
+
+                    if (wysiwygOptions.controls)
                     {
-                        wysiwygOptions.controls = this.controlsConfig[wysiwygOptions.controls];
-                        if (!wysiwygOptions.controls)
+                        if (typeof(wysiwygOptions.controls) === "string")
                         {
-                            wysiwygOptions.controls = {};
+                            wysiwygOptions.controls = self.controlsConfig[wysiwygOptions.controls];
+                            if (!wysiwygOptions.controls)
+                            {
+                                wysiwygOptions.controls = {};
+                            }
                         }
                     }
-                }
 
-                if (this.options.onDemand)
-                {
-                    this.outerEl.find("textarea").mouseover(function() {
+                    if (self.options.onDemand)
+                    {
+                        self.outerEl.find("textarea").mouseover(function() {
 
-                        if (!_this.plugin)
-                        {
-                            _this.plugin = $(this).wysiwyg(wysiwygOptions);
+                            if (!self.plugin)
+                            {
+                                self.plugin = $(this).wysiwyg(wysiwygOptions);
 
-                            _this.outerEl.find(".wysiwyg").mouseout(function() {
+                                self.outerEl.find(".wysiwyg").mouseout(function() {
 
-                                if (_this.plugin) {
-                                    _this.plugin.wysiwyg('destroy');
-                                }
+                                    if (self.plugin) {
+                                        self.plugin.wysiwyg('destroy');
+                                    }
 
-                                _this.plugin = null;
+                                    self.plugin = null;
 
-                            });
-                        }
+                                });
+                            }
+                        });
+                    }
+                    else
+                    {
+                        self.plugin = self.field.wysiwyg(wysiwygOptions);
+                    }
+
+                    self.outerEl.find(".wysiwyg").mouseout(function() {
+                        self.data = _this.getValue();
+                        self.renderValidationState();
                     });
                 }
-                else
-                {
-                    this.plugin = this.field.wysiwyg(wysiwygOptions);
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-wysiwyg');
                 }
 
-                this.outerEl.find(".wysiwyg").mouseout(function() {
-                    _this.data = _this.getValue();
-                    _this.renderValidationState();
-                });
-            }
+                callback();
+            });
 
-			if (this.fieldContainer) {
-				this.fieldContainer.addClass('alpaca-controlfield-wysiwyg');
-			}
         }
     });
     
@@ -15608,11 +15907,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-state');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-state');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -16098,11 +16405,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-country');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-country');
+                }
+
+                callback();
+
+            });
         },
 
         /**
@@ -16188,11 +16503,18 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-zipcode');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-zipcode');
+                }
+
+                callback();
+            });
         },
 
         /**
@@ -16268,11 +16590,19 @@ address:
         /**
          * @see Alpaca.Fields.TextField#postRender
          */
-        postRender: function() {
-            this.base();
-            if (this.fieldContainer) {
-                this.fieldContainer.addClass('alpaca-controlfield-url');
-            }
+        postRender: function(callback) {
+
+            var self = this;
+
+            this.base(function() {
+
+                if (self.fieldContainer) {
+                    self.fieldContainer.addClass('alpaca-controlfield-url');
+                }
+
+                callback();
+
+            });
         },
 
         /**
